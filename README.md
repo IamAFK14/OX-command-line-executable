@@ -6,7 +6,7 @@
 To run this product, type **OX** or **OX.exe**
 
 ## How to use
-To use this product, you have to run **OX <Input file> [flags]**. run **OX -h** for more info
+To use this product, you have to run **OX `<Input file>` [flags]**. run **OX -h** for more info
 
 ## NOTE
 - This product is free, so you can change the source code, redistribute it and ect. without any problems
