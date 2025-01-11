@@ -2,12 +2,12 @@
 #include <string.h>
 #include <cctype>
 #include <iostream>
-
-#define elif else if
+#include <sstream>
+#include <algorithm>
 
 Params Utils::parseArguments(int argc, char** argv)
 {
-	Params args = {"", false, false, false, false, false, ""};
+	Params args = {"", false, false, false, false, false, false, ""};
 
 	args.inputFile = argv[1];
 
@@ -16,16 +16,22 @@ Params Utils::parseArguments(int argc, char** argv)
 		if(strcmp(argv[i], "-h") == 0)
 		{
 			args.helpInfo = true;
+            break;
 		}
-		elif(strcmp(argv[i], "-q") == 0)
+        else if(strcmp(argv[i], "-v") == 0)
+        {
+            args.version = true;
+            break;
+        }
+		else if(strcmp(argv[i], "-q") == 0)
 		{
 			args.quiet = true;
 		}
-		elif(strcmp(argv[i], "-Wall") == 0)
+		else if(strcmp(argv[i], "-Wall") == 0)
 		{
 			args.showAllWarnings = true;
 		}
-		elif(strcmp(argv[i], "-Wextra") == 0)
+		else if(strcmp(argv[i], "-Wextra") == 0)
 		{
 			args.showExtraWarnings = true;
 		}
@@ -158,33 +164,231 @@ std::string Utils::readEntry(std::ifstream& inputFile)
 	return entryFunction;
 }
 
-std::string Utils::getToken(std::string code, size_t& i)
-{
-    bool tokenFinished = false;
+std::string Utils::getToken(const std::string& input, size_t& pos) {
     std::string token;
-	for(size_t x = i; x < code.length(); x++ && i++)
-	{
-		switch(code[x])
-		{
-		case '\r':
-		case '\n':
-		case '\t':
-			tokenFinished = true;
-			continue;
-		default:
-			if(isspace(code[x]))
-				tokenFinished = true;
-			else
-			{
-				token += code[x];
-			}
-		}
-		
-		if(tokenFinished)
-		{
-		    if(!token.empty())
-		        break;
-		}
-	}
-	return token;
+    bool inQuotes = false;
+    bool inParentheses = false;
+    
+    while (pos < input.size()) {
+        char currentChar = input[pos];
+        
+        // Handle start of a string literal
+        if (currentChar == '"' && !inParentheses) {
+            if (inQuotes) {
+                token += currentChar;  // Add the closing quote
+                pos++;
+                break;
+            } else {
+                inQuotes = true;
+                token += currentChar;  // Add the opening quote
+                pos++;
+                continue;
+            }
+        }
+
+        // Handle parentheses
+        if (currentChar == '(') {
+            inParentheses = true;
+            token += currentChar;
+            pos++;
+            continue;
+        }
+
+        if (currentChar == ')') {
+            inParentheses = false;
+            token += currentChar;
+            pos++;
+            continue;
+        }
+
+        // If inside parentheses or quotes, keep adding characters
+        if (inParentheses || inQuotes) {
+            token += currentChar;
+            pos++;
+        } else if (!isspace(currentChar)) {  // Skip spaces outside parentheses
+            token += currentChar;
+            pos++;
+        } else {  // Break on space outside quotes or parentheses
+            if (!token.empty()) {
+                break;
+            } else {
+                pos++;
+            }
+        }
+    }
+
+    return token;
+}
+
+#define NON_INTERNAL 0
+
+uint32_t INTERNAL_FUNCTIONS[] = {
+    0, // not internal function
+    1, // EXIT function
+    2, // PRINT function
+    
+};
+
+std::string InternalFunctions[] = {
+    "exit",
+    "print"
+};
+
+uint32_t Utils::checkForIFunctions(std::string Token)
+{
+    std::string Name;
+    bool validName = false;
+    for(size_t i = 0; i < Token.length(); i++)
+    {
+        if(Token[i] == '(')
+        {
+            validName = true;
+            break;
+        }
+        Name += Token[i];
+    }
+
+    if(!validName) return INTERNAL_FUNCTIONS[NON_INTERNAL];
+
+    size_t size = sizeof(InternalFunctions) / sizeof(InternalFunctions[0]);
+
+    for(size_t i = 0; i < size; i++)
+    {
+        if(InternalFunctions[i] == Name)
+        {
+            return INTERNAL_FUNCTIONS[i + 1];
+        }
+    }
+
+    return INTERNAL_FUNCTIONS[NON_INTERNAL];
+}
+
+bool Utils::isInteger(const std::string& str)
+{
+    std::string trimmed = str;
+    trimmed.erase(trimmed.find_last_not_of(" \t\r\n") + 1);
+    try {
+        std::stoi(trimmed);  // Attempt to convert to integer
+        return true;          // Conversion successful
+    } catch (const std::invalid_argument& e) {
+        return false;         // Not a valid integer
+    } catch (const std::out_of_range& e) {
+        return false;         // Value out of range
+    }
+}
+
+
+FuncArgs Utils::getFuncArgs(std::string token)
+{
+    FuncArgs args = {};
+    size_t x = 0;
+    bool finished = false;
+    bool inQuotes = false;
+    std::string currentArg;
+
+    // Skip function name part until '('
+    while(x < token.length() && token[x] != '(')
+    {
+        x++;
+    }
+
+    if(x == token.length()) return args; // No arguments if no '(' is found
+
+    x++; // Skip the '(' character
+    while(x < token.length() && !finished)
+    {
+        // Handle spaces and commas
+        if((isspace(token[x]) || token[x] == ',') && !inQuotes)
+        {
+            if(!currentArg.empty())
+            {
+                args.Args[args.ArgCount].ArgStr = currentArg;
+                args.Args[args.ArgCount].ArgType = isInteger(currentArg) ? INTEGER : STRING;
+                args.ArgCount++;
+                currentArg.clear();
+            }
+        }
+        // Handle closing parenthesis
+        else if(token[x] == ')')
+        {
+            finished = true;
+        }
+        // Handle quotes (strings)
+        else if(token[x] == '"')
+        {
+            if(inQuotes) {
+                currentArg += token[x];  // Add closing quote
+                inQuotes = false;        // Close the string
+            }
+            else {
+                inQuotes = true;         // Open the string
+                currentArg += token[x];  // Add opening quote
+            }
+        }
+        else
+        {
+            // Add character to current argument (normal characters)
+            currentArg += token[x];
+        }
+
+        x++;
+    }
+
+    // Add the last argument if any
+    if(!currentArg.empty())
+    {
+        args.Args[args.ArgCount].ArgStr = currentArg;
+        args.Args[args.ArgCount].ArgType = isInteger(currentArg) ? INTEGER : STRING;
+        args.ArgCount++;
+    }
+
+    return args;
+}
+
+#include <iostream>
+#include <string>
+#include <algorithm>
+
+void Utils::handlePrint(FuncArgs args)
+{
+    // Check if there are arguments to print
+    if (args.ArgCount > 0) {
+        for (int i = 0; i < args.ArgCount; i++) {
+            std::string argument = args.Args[i].ArgStr;
+
+            // Remove surrounding quotes (if any)
+            if (argument.size() >= 2 && 
+               ((argument.front() == '"' && argument.back() == '"') || 
+                (argument.front() == '\'' && argument.back() == '\''))) {
+                argument = argument.substr(1, argument.size() - 2);
+            }
+
+            // Process escape sequences
+            std::string processed;
+            for (size_t j = 0; j < argument.size(); ++j) {
+                if (argument[j] == '\\' && j + 1 < argument.size()) {
+                    switch (argument[j + 1]) {
+                        case 'n': processed += '\n'; break;
+                        case 'r': processed += '\r'; break;
+                        case 't': processed += '\t'; break;
+                        case '\\': processed += '\\'; break;
+                        case '"': processed += '"'; break;
+                        case '\'': processed += '\''; break;
+                        default: processed += '\\'; processed += argument[j + 1]; break;
+                    }
+                    ++j; // Skip the escaped character
+                } else {
+                    processed += argument[j];
+                }
+            }
+
+            // Print the processed argument
+            std::cout << processed;
+
+            // Add a space after each argument, but not after the last one
+            if (i < args.ArgCount - 1) {
+                std::cout << " ";
+            }
+        }
+    }
 }

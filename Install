@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+set -e
+
 sudo rm -rf /usr/bin/OX/*
 sudo rmdir /usr/bin/OX
 

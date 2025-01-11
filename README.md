@@ -11,3 +11,4 @@ To use this product, you have to run `OX` `<Input file>` `[flags]`. run `OX -h` 
 ## NOTE
 - This product is free, so you can change the source code, redistribute it and ect. without any problems
 - This product does not compile the source code, only runs it in a terminal
+- Currently this product is under developement
