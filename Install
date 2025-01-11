@@ -7,6 +7,8 @@ sudo mkdir -p /usr/bin/OX
 sudo mkdir -p /usr/bin/OX/bin
 sudo mkdir -p /usr/bin/OX/lib
 
+cp output/bin/OX.exe output/bin/OX
+
 sudo rsync -a --ignore-missing-args output/bin/ /usr/bin/OX/bin/
 sudo rsync -a --ignore-missing-args output/lib/ /usr/bin/OX/lib/
 
