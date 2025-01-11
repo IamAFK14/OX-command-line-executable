@@ -1,0 +1,13 @@
+#!/usr/bin/bash
+
+sudo rm -rf /usr/bin/OX/*
+sudo rmdir /usr/bin/OX
+
+sudo mkdir -p /usr/bin/OX
+sudo mkdir -p /usr/bin/OX/bin
+sudo mkdir -p /usr/bin/OX/lib
+
+sudo rsync -a --ignore-missing-args output/bin/ /usr/bin/OX/bin/
+sudo rsync -a --ignore-missing-args output/lib/ /usr/bin/OX/lib/
+
+export PATH=/usr/bin/OX/bin:$PATH
